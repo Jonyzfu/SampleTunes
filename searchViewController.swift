@@ -15,6 +15,9 @@ class SearchViewController: UIViewController {
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var searchBar: UISearchBar!
     
+    let defaultSession = NSURLSession(configuration: NSURLSessionConfiguration.defaultSessionConfiguration())
+    var dataTask: NSURLSessionDataTask?
+    
     var searchResults = [Track]()
     
     lazy var tapRecognizer: UITapGestureRecognizer = {
@@ -140,7 +143,37 @@ extension SearchViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(searchBar: UISearchBar) {
         // Dismiss the keyboard
         dismissKeyboard()
-        // TODO
+        
+        if !searchBar.text!.isEmpty {
+            if dataTask != nil {
+                dataTask?.cancel()
+            }
+            
+            UIApplication.sharedApplication().networkActivityIndicatorVisible = true
+            
+            let expectedCharSet = NSCharacterSet.URLQueryAllowedCharacterSet()
+            let searchTerm = searchBar.text!.stringByAddingPercentEncodingWithAllowedCharacters(expectedCharSet)
+            
+            let url = NSURL(string: "https://itunes.apple.com/search?media=music&entity=song&term=\(searchTerm)")
+            
+            dataTask = defaultSession.dataTaskWithURL(url!) {
+                data, response, error in
+                
+                dispatch_async(dispatch_get_main_queue()) {
+                    UIApplication.sharedApplication().networkActivityIndicatorVisible = false
+                }
+                
+                if let error  = error {
+                    print(error.localizedDescription)
+                } else if let httpResponse = response as? NSHTTPURLResponse {
+                    if httpResponse.statusCode == 200 {
+                        self.updateSearchResults(data)
+                    }
+                }
+            }
+            
+            dataTask?.resume()
+        }
     }
     
     func positionForBar(bar: UIBarPositioning) -> UIBarPosition {
